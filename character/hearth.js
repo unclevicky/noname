@@ -5,7 +5,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 		character:{
 			hs_jaina:['female','wei',3,['huopu','aoshu','bingjia']],
 			hs_lrexxar:['male','shu',4,['yushou']],
-			hs_wuther:['male','qun',4,['fengxian','jieming']],
+			hs_wuther:['male','qun',4,['fengxian','rejieming']],
 			hs_jgarrosh:['male','shu',4,['zhanhou','qiangxi']],
 			hs_malfurion:['male','wu',4,['jihuo']],
 			hs_guldan:['male','wei',3,['moxie','fuhua','hongxi']],
@@ -313,7 +313,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 						forced:true,
 						priority:-1,
 						filter:function(event,player){
-							return event.card==player.storage.wxuying;
+							return event.cards.contains(player.storage.wxuying);
 						},
 						content:function(){
 							if(_status.currentPhase==player){
@@ -1379,6 +1379,7 @@ game.import('character',function(lib,game,ui,get,ai,_status){
 					player.discard(cards);
 					if(event.position=='e'){
 						var name=cards[0].name;
+						if(name.indexOf('hstianqi_')!=0) return;
 						for(var i=0;i<player.storage.hstianqi.length;i++){
 							if(player.storage.hstianqi[i].name==name){
 								return;

@@ -15,6 +15,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				forceDie:true,
 				onLose:function(){
 					player.unmarkSkill('muniu_skill6');
+					delete player.getStat('skill').muniu_skill;
 					if((event.getParent(2)&&event.getParent(2).name!='swapEquip')&&event.parent.type!='equip'&&card&&card.cards&&card.cards.length){
 						player.$throw(card.cards,1000);
 						player.popup('muniu');
@@ -26,7 +27,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				clearLose:true,
 				equipDelay:false,
 				loseDelay:false,
-				skills:['muniu_skill','muniu_skill2','muniu_skill6','muniu_skill7'],
+				skills:['muniu_skill','muniu_skill4','muniu_skill6','muniu_skill7'],
 				ai:{
 					equipValue:function(card){
 						if(card.card) return 7+card.card.length;
@@ -49,7 +50,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				lianheng:true,
 				logv:false,
 				savable:function(card,player,dying){
-					return dying==player;
+					return dying==player||player.hasSkillTag('jiuOther',null,dying,true);
 				},
 				usable:1,
 				selectTarget:-1,
@@ -58,8 +59,9 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 					return target==player;
 				},
 				content:function(){
+					if(typeof event.baseDamage!='number') event.baseDamage=1;
 					if(target.isDying()||event.getParent(2).type=='dying'){
-						target.recover();
+						target.recover(event.baseDamage);
 						if(_status.currentPhase==target){
 							target.getStat().card.jiu--;
 						}
@@ -70,7 +72,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 							card=cards[0];
 						}
 						if(!target.storage.jiu) target.storage.jiu=0;
-						target.storage.jiu++;
+						target.storage.jiu+=event.baseDamage;
 						game.broadcastAll(function(target,card,gain2){
 							target.addSkill('jiu');
 							if(!target.node.jiu&&lib.config.jiu_effect){
@@ -164,7 +166,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				fullskin:true,
 				type:'trick',
 				enable:true,
-				cardnature:'fire',
+				//cardnature:'fire',
 				filterTarget:function(card,player,target){
 					if(player!=game.me&&player.countCards('h')<2) return false;
 					return target.countCards('h')>0;
@@ -194,7 +196,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 							return 7-get.value(card,evt.player);
 						}
 						return -1;
-					}).prompt=false;
+					}).set('prompt',false);
 					game.delay(2);
 					"step 2"
 					if(result.bool){
@@ -271,8 +273,11 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				},
 				chongzhu:true,
 				ai:{
-					wuxie:function(){
+					wuxie:function(target,card,player,viewer){
 						if(_status.event.getRand()<0.5) return 0;
+						if(player==game.me&&get.attitude(viewer,player)>0){
+							return 0;
+						}
 					},
 					basic:{
 						useful:4,
@@ -351,7 +356,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				fullskin:true,
 				type:'equip',
 				subtype:'equip1',
-				cardnature:'fire',
+				//cardnature:'fire',
 				distance:{attackFrom:-3},
 				ai:{
 					basic:{
@@ -376,19 +381,50 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				fullskin:true,
 				type:'equip',
 				subtype:'equip2',
-				cardnature:'fire',
+				//cardnature:'fire',
 				ai:{
+					value:function(card,player,index,method){
+						if(player.isDisabled(2)) return 0.01;
+						if(card==player.getEquip(2)){
+							if(player.hasSkillTag('noDirectDamage')) return 10;
+							if(game.hasPlayer(function(current){
+								return current!=player&&get.attitude(current,player)<0&&current.hasSkillTag('fireAttack',null,null,true);
+							})) return 0;
+							return 6;
+						}
+						var value=0;
+						var info=get.info(card);
+						var current=player.getEquip(info.subtype);
+						if(current&&card!=current){
+							value=get.value(current,player);
+						}
+						var equipValue=info.ai.equipValue;
+						if(equipValue==undefined){
+							equipValue=info.ai.basic.equipValue;
+						}
+						if(typeof equipValue=='function'){
+							if(method=='raw') return equipValue(card,player);
+							if(method=='raw2') return equipValue(card,player)-value;
+							return Math.max(0.1,equipValue(card,player)-value);
+						}
+						if(typeof equipValue!='number') equipValue=0;
+						if(method=='raw') return equipValue;
+						if(method=='raw2') return equipValue-value;
+						return Math.max(0.1,equipValue-value);
+					},
 					equipValue:function(card,player){
 						if(player.hasSkillTag('maixie')&&player.hp>1) return 0;
 						if(player.hasSkillTag('noDirectDamage')) return 10;
 						if(get.damageEffect(player,player,player,'fire')>=0) return 10;
-						var num=3-game.countPlayer(function(current){
-							return get.attitude(current,player)<0;
+						var num=4-game.countPlayer(function(current){
+							if(get.attitude(current,player)<0){
+								if(current.hasSkillTag('fireAttack',null,null,true)) return 3;
+								return 1;
+							}
+							return false;
 						});
-						if(player.hp==1) num+=4;
+						if(player.hp==1) num+=3;
 						if(player.hp==2) num+=1;
-						if(player.hp==3) num--;
-						if(player.hp>3) num-=4;
 						return num;
 					},
 					basic:{
@@ -403,12 +439,14 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				subtype:'equip2',
 				loseDelay:false,
 				onLose:function(){
-					if(player.isDamaged()) player.logSkill('baiyin_skill');
 					var next=game.createEvent('baiyin_recover');
 					event.next.remove(next);
-					event.getParent().after.push(next);
+					var evt=event.getParent();
+					if(evt.getlx===false) evt=evt.getParent();
+					evt.after.push(next);
 					next.player=player;
 					next.setContent(function(){
+						if(player.isDamaged()) player.logSkill('baiyin_skill');
 						player.recover();
 					});
 				},
@@ -545,7 +583,6 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 					}
 				},
 				ai:{
-					save:true,
 					respondSha:true,
 					respondShan:true,
 					skillTagFilter:function(player,tag){
@@ -555,13 +592,6 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 							switch(tag){
 								case 'respondSha':if(muniu.cards[i].name=='sha') return true;break;
 								case 'respondShan':if(muniu.cards[i].name=='shan') return true;break;
-								case 'save':{
-									if(muniu.cards[i].name=='tao'||muniu.cards[i].name=='spell_zhiliaoshui') return true;
-									if(player==_status.event.dying){
-										if(muniu.cards[i].name=='jiu'||muniu.cards[i].name=='tianxianjiu') return true;
-									}
-									break;
-								}
 							}
 						}
 						return false;
@@ -614,10 +644,6 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 						trigger.untrigger();
 						trigger.responded=true;
 						trigger.result={bool:true,card:result.links[0],cards:result.links.slice(0)};
-						var muniu=player.getEquip(5);
-						muniu.cards.remove(result.links[0]);
-						lib.skill.muniu_skill.sync(muniu);
-						player.updateMarks();
 					}
 				},
 				ai:{
@@ -627,7 +653,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				}
 			},
 			muniu_skill4:{
-				enable:'chooseToUse',
+				enable:['chooseToUse','chooseToRespond'],
 				filter:function(event,player){
 					var muniu=player.getEquip(5);
 					if(!muniu.cards) return false;
@@ -649,46 +675,43 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 						return true;
 					},
 					check:function(button){
-						if(button.link.name=='du') return 2;
+						if(_status.event.getParent().type!='phase') return 1;
+						if(button.link.name=='du') return 10;
 						var player=_status.event.player;
-						if(button.link.name=='xingjiegoutong'&&player.countCards('h')>1) return -2;
-						if(get.select(get.info(button.link).selectTarget)[1]==-1){
-							if(get.type(button.link)=='delay') return -1;
-							if(get.type(button.link)=='equip'){
-								var current=player.getCards('e',{subtype:get.subtype(button.link)})[0];
-								if(current&&get.equipValue(current)>=get.equipValue(button.link)) return -1;
-								return 1;
-							}
-							if(get.tag(button.link,'multitarget')) return -1;
-							if(button.link.name=='huoshaolianying') return -1;
-						}
-						if(button.link.name=='jiu'){
-							if(get.effect(player,{name:'jiu'},player)>0){
-								return 1;
-							}
-							return -1;
-						}
-						return 1;
+						if(player.getUseValue(button.link)>0) return get.order(button.link);
+						return -1;
 					},
 					backup:function(links,player){
 						return {
-							prompt:'选择'+get.translation(links)+'的目标',
 							filterCard:function(){return false},
 							selectCard:-1,
+							position:'h',
 							viewAs:links[0],
-							onuse:function(result,player){
-								var muniu=player.getEquip(5);
-								if(muniu&&muniu.cards){
-									muniu.cards.remove(result.card);
-									lib.skill.muniu_skill.sync(muniu);
-								}
-								player.updateMarks();
-							}
-						}
+							precontent:function(){
+								delete event.result.skill;
+							},
+						};
+					},
+					prompt:function(links){
+						return '选择'+get.translation(links)+'的目标';
 					},
 				},
 				ai:{
-					order:4,
+					order:function(item,player){
+						var event=_status.event;
+						if(event.type!='phase') return 4;
+						if(!player) return -1;
+						var muniu=player.getEquip('muniu');
+						if(!muniu||!muniu.cards) return -1;
+						var order=0;
+						for(var i=0;i<muniu.cards.length;i++){
+							if(player.getUseValue(muniu.cards[i])>0){
+								var order2=get.order(muniu.cards[i]);
+								if(order2>order) order=order2
+							}
+						}
+						return order+0.1;
+					},
 					result:{
 						player:function(player){
 							if(_status.event.dying) return get.attitude(player,_status.event.dying);
@@ -730,7 +753,6 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				}
 			},
 			muniu_skill7:{
-				filter:function(){return false},
 				hiddenCard:function(player,name){
 					var muniu=player.getEquip(5);
 					if(!muniu.cards) return false;
@@ -739,6 +761,24 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 						if(muniu.cards[i].name==name) return true;
 					}
 					return false;
+				},
+				trigger:{global:'cardsGotoOrderingEnd'},
+				silent:true,
+				firstDo:true,
+				filter:function(event,player){
+					var muniu=player.getEquip('muniu');
+					if(!muniu||!muniu.cards) return false;
+					return event.cards&&event.cards.filter(function(card){
+						return muniu.cards.contains(card);
+					}).length>0;
+				},
+				content:function(){
+					var muniu=player.getEquip(5);
+					if(muniu&&muniu.cards){
+						muniu.cards.remove(trigger.cards);
+						lib.skill.muniu_skill.sync(muniu);
+					}
+					player.updateMarks();
 				},
 			},
 			huogong2:{},
@@ -764,6 +804,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				vanish:true,
 				silent:true,
 				popup:false,
+				nopop:true,
 				onremove:function(player){
 					if(player.node.jiu){
 						player.node.jiu.delete();
@@ -814,8 +855,8 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 				},
 				ai:{
 					effect:{
-						player:function(card,player,target,current){
-							if(card.name=='sha'&&target.countCards('h')==0&&!target.hasSkillTag('filterDamage',null,{
+						player:function(card,player,target,current,isLink){
+							if(card.name=='sha'&&!isLink&&target.countCards('h')==0&&!target.hasSkillTag('filterDamage',null,{
 								player:player,
 								card:card,
 							})) return [1,0,1,-3];
@@ -838,6 +879,8 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 					})) return false;
 					if(event.card.name=='nanman') return true;
 					if(event.card.name=='wanjian') return true;
+					if(event.card.name=='chuqibuyi') return true;
+					return false;
 				},
 				content:function(){
 					trigger.cancel();
@@ -848,14 +891,14 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 							if(target.hasSkillTag('unequip2')) return;
 							if(player.hasSkillTag('unequip',false,{
 								name:card?card.name:null,
-								target:player,
+								target:target,
 								card:card
 							})||player.hasSkillTag('unequip_ai',false,{
 								name:card?card.name:null,
-								target:player,
+								target:target,
 								card:card
 							})) return;
-							if(card.name=='nanman'||card.name=='wanjian') return 'zerotarget';
+							if(card.name=='nanman'||card.name=='wanjian'||card.name=='chuqibuyi') return 'zerotarget';
 							if(card.name=='sha'){
 								var equip1=player.getEquip(1);
 								if(equip1&&equip1.name=='zhuque') return 1.9;
@@ -884,6 +927,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 					trigger.num++;
 				},
 				ai:{
+					fireAttack:true,
 					effect:{
 						target:function(card,player,target,current){
 							if(card.name=='sha'){
@@ -1018,7 +1062,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 			guding_info:'锁定技，当你使用【杀】对目标角色造成伤害时，若其没有手牌，此伤害+1。',
 			guding_skill:'古锭刀',
 			tengjia:'藤甲',
-			tengjia_info:'锁定技，【南蛮入侵】、【万箭齐发】和普通【杀】对你无效。你每次受到火焰伤害时，该伤害+1。',
+			tengjia_info:'锁定技，【南蛮入侵】、【万箭齐发】、【出其不意】和普通【杀】对你无效。当你受到火焰伤害时，该伤害+1。',
 			tengjia1:'藤甲',
 			tengjia2:'藤甲',
 			tengjia3:'藤甲',
@@ -1075,7 +1119,7 @@ game.import('card',function(lib,game,ui,get,ai,_status){
 			["diamond",13,"hualiu"],
 			["club",1,"baiyin"],
 			["spade",2,"tengjia"],
-			["club",2,"tengjia",'fire'],
+			["club",2,"tengjia"],
 			["spade",1,"guding"],
 			["diamond",1,"zhuque"],
 

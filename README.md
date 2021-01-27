@@ -1,5 +1,5 @@
-百度网盘分流
+客户端下载戳这里：
 
-数据包 https://pan.baidu.com/s/1CqSyEelJfuMhnPgFGJFWKg 提取码:70yq
+GitHub： https://github.com/libccy/noname/releases/tag/SSS
 
-安卓/Windows/iOS客户端 https://pan.baidu.com/s/1NTGyQFpyaAFN6Lhx5AYEWA 提取码:6ea7
+Coding： https://nakamurayuri.coding.net/p/noname/d/noname/git/releases/SSS
